@@ -84,9 +84,12 @@ export class Cloth {
     this.prev.set(pos);
     this.vel.fill(0);
     this.invMass.fill(1);
-    for (const c of this.pins) {
-      this.invMass[c] = 0;
-      pos[c * 3 + 2] = 0;
+    // Each clip grips a small width of cloth, not a single point.
+    for (const pc of this.pins) {
+      for (let c = Math.max(0, pc - 1); c <= Math.min(cols - 1, pc + 1); c++) {
+        this.invMass[c] = 0;
+        pos[c * 3 + 2] = 0;
+      }
     }
     this.grabbed = null;
     this.updateNormals();
@@ -107,12 +110,30 @@ export class Cloth {
         items.push(i, pos[i * 3] - pos[index * 3], pos[i * 3 + 1] - pos[index * 3 + 1], pos[i * 3 + 2] - pos[index * 3 + 2]);
       }
     }
-    this.grabbed = { items, x: pos[index * 3], y: pos[index * 3 + 1], z: pos[index * 3 + 2] };
+    // How far this point can be from each clip before the threads would have to stretch.
+    const dx = this.width / (cols - 1), dy = this.height / (rows - 1);
+    const give = 1.01 + this.physics.stretch * 0.5;
+    const reach = this.pins.map((pc) => Math.hypot((c0 - pc) * dx, r0 * dy) * give);
+    this.grabbed = { items, reach, x: pos[index * 3], y: pos[index * 3 + 1], z: pos[index * 3 + 2] };
   }
 
+  // Move the held point. The hand cannot pull it further than the cloth is long.
   moveGrab(x, y, z) {
-    if (!this.grabbed) return;
-    this.grabbed.x = x; this.grabbed.y = y; this.grabbed.z = z;
+    const g = this.grabbed;
+    if (!g) return;
+    const { pos, pins } = this;
+    for (let pass = 0; pass < 4; pass++) {
+      for (let k = 0; k < pins.length; k++) {
+        const i = pins[k] * 3;
+        const ox = x - pos[i], oy = y - pos[i + 1], oz = z - pos[i + 2];
+        const d = Math.sqrt(ox * ox + oy * oy + oz * oz);
+        if (d > g.reach[k]) {
+          const f = g.reach[k] / d;
+          x = pos[i] + ox * f; y = pos[i + 1] + oy * f; z = pos[i + 2] + oz * f;
+        }
+      }
+    }
+    g.x = x; g.y = y; g.z = z;
   }
 
   release() {
@@ -177,6 +198,23 @@ export class Cloth {
         // Bend links only resist folding, never pulling apart.
         if (kd === 2 && len > rest[k]) continue;
         const corr = (len - rest[k]) / (w + comp[kd]) / len;
+        pos[i] += dx * corr * wa; pos[i + 1] += dy * corr * wa; pos[i + 2] += dz * corr * wa;
+        pos[j] -= dx * corr * wb; pos[j + 1] -= dy * corr * wb; pos[j + 2] -= dz * corr * wb;
+      }
+
+      // Second sweep, bottom to top, over the thread links only. Woven threads barely
+      // stretch, and this keeps the cloth from behaving like rubber when it is pulled.
+      for (let k = nc - 1; k >= 0; k--) {
+        if (kind[k] !== 0) continue;
+        const pa = ca[k], pb = cb[k];
+        const wa = invMass[pa], wb = invMass[pb];
+        const w = wa + wb;
+        if (w === 0) continue;
+        const i = pa * 3, j = pb * 3;
+        const dx = pos[j] - pos[i], dy = pos[j + 1] - pos[i + 1], dz = pos[j + 2] - pos[i + 2];
+        const len = Math.sqrt(dx * dx + dy * dy + dz * dz);
+        if (len < 1e-9) continue;
+        const corr = (len - rest[k]) / (w + comp[0]) / len;
         pos[i] += dx * corr * wa; pos[i + 1] += dy * corr * wa; pos[i + 2] += dz * corr * wa;
         pos[j] -= dx * corr * wb; pos[j + 1] -= dy * corr * wb; pos[j + 2] -= dz * corr * wb;
       }
