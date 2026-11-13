@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>Indian Home Fabrics</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=Instrument+Sans:wght@400;500;600&display=swap">
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+<div class="app">
+  <div class="stage">
+    <div id="swatch" class="swatch"></div>
+    <div class="stage-top">
+      <span class="wordmark">Indian Home Fabrics</span>
+      <div class="stage-actions">
+        <button type="button" id="reset" class="chip">Reset</button>
+        <button type="button" id="closeup" class="chip" aria-pressed="false">Close-up</button>
+      </div>
+    </div>
+    <div class="stage-bottom">
+      <p id="caption" class="caption" hidden></p>
+      <div class="stage-row">
+        <div id="lights" class="lights" role="group" aria-label="Light"></div>
+        <p id="hint" class="hint">Drag the cloth to pull it. Drag beside it to turn. Pinch to zoom.</p>
+      </div>
+    </div>
+  </div>
+  <main id="panel" class="panel"></main>
+</div>
+<script type="module" src="src/main.js"></script>
+</body>
+</html>
