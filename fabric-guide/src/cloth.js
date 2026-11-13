@@ -66,6 +66,7 @@ export class Cloth {
     this.compliance[2] = Math.pow(10, lerp(1.6, -2.6, p.stiffness)) * mass;
     this.airK = 0.6 / (p.gsm / 1000); // light cloth is pushed more by moving air
     this.damping = lerp(0.2, 3.5, p.damping);
+    this.friction = lerp(0.02, 0.3, p.damping); // fibres rubbing inside the cloth soak up movement
     this.gather = p.gather ?? 0.85;
   }
 
@@ -107,6 +108,7 @@ export class Cloth {
       for (let c = Math.max(0, c0 - 1); c <= Math.min(cols - 1, c0 + 1); c++) {
         const i = r * cols + c;
         if (this.invMass[i] === 0) continue;
+        this.invMass[i] = 0; // held firmly by the finger while grabbed
         items.push(i, pos[i * 3] - pos[index * 3], pos[i * 3 + 1] - pos[index * 3 + 1], pos[i * 3 + 2] - pos[index * 3 + 2]);
       }
     }
@@ -137,6 +139,12 @@ export class Cloth {
   }
 
   release() {
+    if (!this.grabbed) return;
+    const g = this.grabbed.items;
+    for (let k = 0; k < g.length; k += 4) {
+      this.invMass[g[k]] = 1;
+      this.vel.fill(0, g[k] * 3, g[k] * 3 + 3); // let go gently, do not fling
+    }
     this.grabbed = null;
   }
 
@@ -179,9 +187,9 @@ export class Cloth {
         const g = grabbed.items;
         for (let k = 0; k < g.length; k += 4) {
           const i = g[k] * 3;
-          pos[i] += (grabbed.x + g[k + 1] - pos[i]) * 0.25;
-          pos[i + 1] += (grabbed.y + g[k + 2] - pos[i + 1]) * 0.25;
-          pos[i + 2] += (grabbed.z + g[k + 3] - pos[i + 2]) * 0.25;
+          pos[i] += (grabbed.x + g[k + 1] - pos[i]) * 0.2;
+          pos[i + 1] += (grabbed.y + g[k + 2] - pos[i + 1]) * 0.2;
+          pos[i + 2] += (grabbed.z + g[k + 3] - pos[i + 2]) * 0.2;
         }
       }
 
@@ -227,6 +235,23 @@ export class Cloth {
         vel[i + 1] = (pos[i + 1] - prev[i + 1]) * inv;
         vel[i + 2] = (pos[i + 2] - prev[i + 2]) * inv;
       }
+    }
+    this.rub();
+  }
+
+  // Neighbouring points drag on each other, so wobbles die out instead of bouncing.
+  rub() {
+    const { vel, invMass, ca, cb } = this;
+    const f = this.friction;
+    for (let k = 0; k < ca.length; k++) {
+      const pa = ca[k], pb = cb[k];
+      const wa = invMass[pa], wb = invMass[pb];
+      if (wa + wb === 0) continue;
+      const i = pa * 3, j = pb * 3;
+      const m = f / (wa + wb);
+      const dx = (vel[j] - vel[i]) * m, dy = (vel[j + 1] - vel[i + 1]) * m, dz = (vel[j + 2] - vel[i + 2]) * m;
+      vel[i] += dx * wa; vel[i + 1] += dy * wa; vel[i + 2] += dz * wa;
+      vel[j] -= dx * wb; vel[j + 1] -= dy * wb; vel[j + 2] -= dz * wb;
     }
   }
 

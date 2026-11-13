@@ -113,7 +113,7 @@ export const FABRICS = [
       warmth: [1, 'It is thin and airy, so it holds almost no body heat.'],
       stretch: [1, 'It is woven, not knitted, so it gives only a little on the slant.'],
     },
-    physics: { gsm: 65, stiffness: 0.06, stretch: 0.03, damping: 0.25, gather: 0.74 },
+    physics: { gsm: 65, stiffness: 0.06, stretch: 0.03, damping: 0.65, gather: 0.74 },
     look: {
       colour: '#f2eee4',
       threadsPerTile: 16,
